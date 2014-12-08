@@ -3,6 +3,8 @@
 
 #include <sys/types.h>
 
+#include "cmrconfig.h"
+
 enum cmr_split_source {
         SPLIT_STREAM = 0,
         SPLIT_FILES,
@@ -11,7 +13,7 @@ enum cmr_split_source {
 struct cmr_split_piece {
         int fd;                 /* file descriptor*/
         size_t start;           /* starting byte */
-        size_t len;             /* ending byte */
+        size_t len;             /* piece size */
 };
 
 struct cmr_split {
@@ -25,5 +27,7 @@ struct cmr_split {
         struct cmr_split_piece *pieces; /** set of pieces for SPLIT_FILES */
 };
 
+struct cmr_split *cmrsplit(struct cmr_config *cfg);
+void cmrsplit_free(struct cmr_split *f);
 
 #endif

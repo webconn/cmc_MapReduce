@@ -12,6 +12,8 @@ struct cmr_config {
         char **split_argv;      /** argv for Split function */
 
         int filenames_num;      /** number of files in input stream */
+        int str_num;            /** number of strings from input stream to send */
+
         char **filenames;       /** input file name */
 };
 

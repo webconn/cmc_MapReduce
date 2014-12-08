@@ -11,7 +11,7 @@
 #include "config.h"
 #include "cmrconfig.h"
 
-static const char *optstring = "-hM:m:R:r:S:";
+static const char *optstring = "-hM:m:R:r:S:l:";
 
 static const struct option opts[] = {
         { .name = "help", .has_arg = 0, .flag = NULL, .val = 'h' },
@@ -20,16 +20,18 @@ static const struct option opts[] = {
         { .name = "split", .has_arg = 1, .flag = NULL, .val = 'S' },
         { .name = "num_map", .has_arg = 1, .flag = NULL, .val = 'm' },
         { .name = "num_reduce", .has_arg = 1, .flag = NULL, .val = 'r' },
+        { .name = "lines", .has_arg = 1, .flag = NULL, .val = 'l' },
         NULL
 };
 
 static const char *help_msg = "Usage: cmapreduce -M \"map command\" -R \"reduce comand\" [args] [input_file]\n\n"
         " -h, --help\t\t\tPrint this message\n"
-        " -M, --map \"command\"\t\tMap command (with arguments in quotes)\n"
+        " -l, --lines=n\t\t\tNumber of lines from input stream to send to mappers from each iteration\n"
+        " -M, --map=\"command\"\t\tMap command (with arguments in quotes)\n"
         " -m, --num_map n\t\tNumber of Map processes (default = %d)\n"
-        " -R, --reduce \"command\"\t\tReduce command (with argumenst in quotes)\n"
+        " -R, --reduce=\"command\"\t\tReduce command (with argumenst in quotes)\n"
         " -r, --num_reduce n\t\tNumber of Reduce processes (default = %d)\n"
-        " -S, --split \"command\"\t\t(optional) Split command\n\n";
+        " -S, --split=\"command\"\t\t(optional) Split command\n\n";
 
 void print_help(FILE *stream)
 {
@@ -103,9 +105,13 @@ struct cmr_config *ui_parse(int argc, char *argv[])
 
         int c;
         int f_exit = 0, f_split = 0, f_map = 0, f_reduce = 0;
+        int lnum = 0;
 
         while ((c = getopt_long(argc, argv, optstring, opts, NULL)) > 0) {
                 switch (c) {
+                        case 'l':
+                                lnum = atoi(optarg);
+                                break;
                         case 'M':
                                 ret->map_argv = create_argv(optarg);
                                 f_map = 1;
@@ -156,6 +162,11 @@ struct cmr_config *ui_parse(int argc, char *argv[])
                         ret->filenames[i] = (char *) malloc(strlen(tmp) + 1);
                         strcpy(ret->filenames[i], tmp);
                 }
+        } else {
+                if (lnum > 0)
+                        ret->str_num = lnum;
+                else
+                        ret->str_num = CONFIG_DFL_STR_NUM;
         }
 
         return ret;

@@ -3,6 +3,7 @@
 
 #define CONFIG_DFL_MAP_NUM      1
 #define CONFIG_DFL_REDUCE_NUM   1
+#define CONFIG_DFL_STR_NUM      1
 #define CONFIG_MIN_FILENAMES    10
 
 #endif
