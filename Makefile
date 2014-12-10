@@ -7,7 +7,7 @@ INCLUDEDIR = include
 
 CC = gcc
 
-CFLAGS = -std=gnu99 -I$(INCLUDEDIR) -g
+CFLAGS = -std=gnu99 -I$(INCLUDEDIR) -g -Wall
 LDFLAGS = -lm
 
 OBJS := $(addprefix $(BUILDDIR)/, $(OBJS))

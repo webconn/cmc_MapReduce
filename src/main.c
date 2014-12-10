@@ -23,15 +23,20 @@ int main(int argc, char *argv[])
 
         /* Split input stream */
         struct cmr_split *split = cmrsplit(config);
-        
+  
+        if (!split) {
+                fprintf(stderr, " [SPLIT] FATAL: Error processing chunks list\n");
+                cmrconfig_free(config);
+                exit(1);
+        }
         if (split->source == SPLIT_FILES) {
                 printf("Configuration of files:\n");
-                for (int i=0; i<split->pieces_num; i++) {
-                        //printf("Piece %02d, fd %d, start %d, size %d\n", i, split->pieces[i].fd, split->pieces[i].start, split->pieces[i].len);
+                for (int i=0; i<split->chunks_num; i++) {
+                        //printf("Piece %02d, fd %d, start %d, size %d\n", i, split->chunks[i].fd, split->chunks[i].start, split->chunks[i].len);
 
                         /* print current piece */
-                        lseek(split->pieces[i].fd, split->pieces[i].start, SEEK_SET);
-                        cmrresend(split->pieces[i].fd, 1, split->pieces[i].len);
+                        lseek(split->chunks[i].fd, split->chunks[i].start, SEEK_SET);
+                        cmrresend(split->chunks[i].fd, 1, split->chunks[i].len);
                 }
         }
 
