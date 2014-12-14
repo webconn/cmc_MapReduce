@@ -6,8 +6,13 @@ struct cmr_config {
         char **map_argv;        /** argv for Map function */
         int map_num;            /** number of Map streams */
 
+        int map_unix;           /** UNIX-compatible mapper flag */
+        char *map_delims;       /** delimiters for UNIX-compatible wrapper */
+        char *map_value;        /** default map value for UNIX wrapper */
+
         char **reduce_argv;     /** argv for Reduce function */
         int reduce_num;         /** number of Reduce streams */
+        int reduce_unix;        /** UNIX-compatible reducer flag */
 
         char **split_argv;      /** argv for Split function */
 

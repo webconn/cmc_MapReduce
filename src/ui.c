@@ -21,7 +21,11 @@ static const struct option opts[] = {
         { .name = "num_map", .has_arg = 1, .flag = NULL, .val = 'm' },
         { .name = "num_reduce", .has_arg = 1, .flag = NULL, .val = 'r' },
         { .name = "lines", .has_arg = 1, .flag = NULL, .val = 'l' },
-        NULL
+        { .name = "unix-mapper", .has_arg = 0, .flag = NULL, .val = 'u' },
+        { .name = "unix-mapper-delim", .has_arg = 1, .flag = NULL, .val = 'd' },
+        { .name = "unix-mapper-value", .has_arg = 1, .flag = NULL, .val = 'v' },
+        { .name = "unix-reducer", .has_arg = 0, .flag = NULL, .val = 'U' },
+        { 0 }
 };
 
 static const char *help_msg = "Usage: cmapreduce -M \"map command\" -R \"reduce comand\" [args] [input_file]\n\n"
@@ -31,7 +35,12 @@ static const char *help_msg = "Usage: cmapreduce -M \"map command\" -R \"reduce 
         " -m, --num_map n\t\tNumber of Map processes (default = %d)\n"
         " -R, --reduce=\"command\"\t\tReduce command (with argumenst in quotes)\n"
         " -r, --num_reduce n\t\tNumber of Reduce processes (default = %d)\n"
-        " -S, --split=\"command\"\t\t(optional) Split command\n\n";
+        " -S, --split=\"command\"\t\t(optional) Split command\n\n"
+        "UNIX wrapper configuration:\n"
+        "     --unix-mapper\t\t\tEnable UNIX-compatible wrapper for mapper\n"
+        "     --unix-mapper-delim=c\t\tDelimiter character(s) for UNIX command output (to split output stream to keys)\n"
+        "     --unix-mapper-value=\"value\"\tDefault value for pairs got from UNIX wrapper\n"
+        "     --unix-reducer\t\t\tEnable UNIX-compatible wrapper for reducer\n\n";
 
 void print_help(FILE *stream)
 {
@@ -98,6 +107,14 @@ struct cmr_config *ui_parse(int argc, char *argv[])
 
         ret->map_num = CONFIG_DFL_MAP_NUM;
         ret->reduce_num = CONFIG_DFL_REDUCE_NUM;
+        ret->map_unix = 0;
+        ret->reduce_unix = 0;
+
+        ret->map_delims = (char *) malloc(sizeof (CONFIG_DFL_MAP_DELIMS) * sizeof (char));
+        strcpy(ret->map_delims, CONFIG_DFL_MAP_DELIMS);
+
+        ret->map_value = (char *) malloc(sizeof (CONFIG_DFL_MAP_VALUE) * sizeof (char));
+        strcpy(ret->map_value, CONFIG_DFL_MAP_VALUE);
         
         ret->filenames_num = 0;
         ret->filenames = (char **) malloc(CONFIG_MIN_FILENAMES * sizeof (char *));
@@ -131,6 +148,24 @@ struct cmr_config *ui_parse(int argc, char *argv[])
                         case 'S':
                                 ret->split_argv = create_argv(optarg);
                                 f_split = 1;
+                                break;
+                        case 'u':
+                                ret->map_unix = 1;
+                                break;
+                        case 'U':
+                                ret->reduce_unix = 1;
+                                break;
+                        case 'd':
+                                if (ret->map_delims)
+                                        free(ret->map_delims);
+                                ret->map_delims = (char *) malloc((strlen(optarg) + 1) * sizeof (char));
+                                strcpy(ret->map_delims, optarg);
+                                break;
+                        case 'v':
+                                if (ret->map_value)
+                                        free(ret->map_value);
+                                ret->map_value = (char *) malloc((strlen(optarg) + 1) * sizeof (char));
+                                strcpy(ret->map_value, optarg);
                                 break;
                         case 1: /* filename detected */
                                 ret->filenames[ret->filenames_num++] = optarg;

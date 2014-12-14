@@ -19,10 +19,8 @@ struct cmr_chunk {
 struct cmr_split {
         enum cmr_split_source source;   /** split source */
         
-        union {
-                int chunks_num;         /** number of chunks in SPLIT_FILES case */
-                int str_num;            /** number of strings to send from input stream */
-        };
+        int chunks_num;         /** number of chunks in SPLIT_FILES case == number of map nodes */
+        int str_num;            /** number of strings to send from input stream */
 
         struct cmr_chunk *chunks; /** set of chunks for SPLIT_FILES */
 };

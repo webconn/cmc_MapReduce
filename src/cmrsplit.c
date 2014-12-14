@@ -76,9 +76,12 @@ inline static struct cmr_split *cmrsplit_local(struct cmr_config *cfg)
         struct cmr_split *ret = (struct cmr_split *) malloc(sizeof (struct cmr_split));
 
         if (cfg->filenames_num == 0) { /* input stream parsing */
+                fprintf(stderr, " [SPLIT] Run internal splitter for input stream; number of strings per mapper: %d\n", ret->str_num);
                 ret->source = SPLIT_STREAM;
                 ret->str_num = cfg->str_num;
+                ret->chunks_num = cfg->map_num;
         } else {
+                fprintf(stderr, " [SPLIT] Run internal splitter for input files\n");
                 ret->source = SPLIT_FILES;
                 /* Calculate streams */
                 if (cfg->filenames_num == 1) { /* single file; split it! */
@@ -105,7 +108,7 @@ inline static struct cmr_split *cmrsplit_local(struct cmr_config *cfg)
                                         break;
                                 }
                                 
-                                ret->chunks[i].fd = fd;
+                                ret->chunks[i].fd = open(cfg->filenames[0], O_RDONLY);
                                 ret->chunks[i].start = start;
                                 ret->chunks[i].len = end - start;
 
@@ -113,6 +116,7 @@ inline static struct cmr_split *cmrsplit_local(struct cmr_config *cfg)
                                 end += piece_size;
                         }
 
+                        close(fd);
                         cfg->map_num = ret->chunks_num;
                         
                 } else { /* multiple files; force number of mappers */
@@ -139,8 +143,8 @@ inline static struct cmr_split *cmrsplit_local(struct cmr_config *cfg)
 inline static struct cmr_split *cmrsplit_deserialize(int fdi)
 {
         struct cmr_split *ret = (struct cmr_split *) malloc(sizeof (struct cmr_split));
-
-        FILE *fd = fdopen(fdi, "r");
+        
+        FILE *fd = fdopen(dup(fdi), "r");
         if (!fd) {
                 perror(" [SPLIT] Deserialze: error opening pipe for reading: ");
                 return NULL;
@@ -184,6 +188,7 @@ inline static struct cmr_split *cmrsplit_deserialize(int fdi)
                         fprintf(stderr, " [SPLIT] Deserializer: unexpected EOL at line %d\n", line);
                         free(ret->chunks);
                         free(ret);
+                        fclose(fd);
                         return NULL;
                 }
 
@@ -191,13 +196,14 @@ inline static struct cmr_split *cmrsplit_deserialize(int fdi)
                 p++;
 
                 /* Read start and len */
-                off_t start;
-                int len;
+                long long start = 0;
+                long long len = 0;
 
-                if (sscanf(p, "%d%d", &start, &len) != 2) {
+                if (sscanf(p, "%lld%lld", &start, &len) != 2) {
                         fprintf(stderr, " [SPLIT] Deserializer: unexpected EOL at line %d\n", line);
                         free(ret->chunks);
                         free(ret);
+                        fclose(fd);
                         return NULL;
                 }
 
@@ -213,6 +219,7 @@ inline static struct cmr_split *cmrsplit_deserialize(int fdi)
                 }
         }
 
+        fclose(fd);
         return ret;
 }
 
@@ -265,6 +272,8 @@ inline static struct cmr_split *cmrsplit_external(struct cmr_config *cfg)
                 exit(1);
         }
         fprintf(stderr, " [SPLIT] External splitter process (PID=%d) exited with status %d, time %.5lf s\n", spl, WEXITSTATUS(status), wtime);
+
+        ret->str_num = 1;
 
         return ret;
 }
