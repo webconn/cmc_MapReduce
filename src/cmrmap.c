@@ -19,7 +19,7 @@ static void emit_keyvalue(char *key, char *value)
         int key_len = strlen(key);
         int val_len = strlen(value);
         printf("%d %d %s%s", key_len + val_len, key_len, key, value);
-        fprintf(stderr, "Emit keyvalue: <\"%s\", \"%s\">\n", key, value);
+        fprintf(stderr, "Emit keyvalue: %d %d %s%s\n", key_len + val_len, key_len, key, value);
 }
 
 static void cmrmap_create_node(int node_id, struct cmr_config *cfg, struct cmr_chunk *chunk, int in_fd, int out_fd)
@@ -176,6 +176,9 @@ struct cmr_map_output *cmrmap(struct cmr_split *split, struct cmr_config *cfg)
 
                 if (ret->nodes[i] == 0) { /* node */
                         close(ins[i]); /* close input pipe */
+                        if (split->source == SPLIT_FILES)
+                                lseek(split->chunks[i].fd, split->chunks[i].start, SEEK_SET);
+
                         cmrmap_create_node(i, cfg, &split->chunks[i], infd[0], outfd[1]);
                 }
                 
