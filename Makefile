@@ -1,5 +1,5 @@
 TARGET = cmapreduce
-OBJS = main.o ui.o generic.o buffer.o cmrconfig.o cmrsplit.o cmrio.o cmrmap.o
+OBJS = main.o ui.o generic.o buffer.o cmrconfig.o cmrsplit.o cmrio.o cmrmap.o cmrshuffle.o cmrreduce.o
 
 BUILDDIR = build
 SRCDIR = src

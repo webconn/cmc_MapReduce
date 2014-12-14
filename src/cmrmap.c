@@ -17,8 +17,11 @@
 static void emit_keyvalue(char *key, char *value)
 {
         int key_len = strlen(key);
+        if (key_len == 0)
+                return;
+
         int val_len = strlen(value);
-        printf("%d %d %s%s", key_len + val_len, key_len, key, value);
+        printf("w%d %d %s%s", key_len + val_len, key_len, key, value);
         fprintf(stderr, "Emit keyvalue: %d %d %s%s\n", key_len + val_len, key_len, key, value);
 }
 
@@ -85,7 +88,7 @@ static void cmrmap_create_node(int node_id, struct cmr_config *cfg, struct cmr_c
         exit(0);
 }
 
-static inline void cmrmap_create_resender(struct cmr_config *cfg, struct cmr_split *split, struct cmr_map_output *maps, int *ins)
+static inline void cmrmap_create_file_resender(struct cmr_config *cfg, struct cmr_split *split, struct cmr_map_output *maps, int *ins)
 {
         pid_t p = fork();
 
@@ -105,6 +108,7 @@ static inline void cmrmap_create_resender(struct cmr_config *cfg, struct cmr_spl
         for (int i=0; i<split->chunks_num; i++) {
                 eofs[i] = 0;
                 bufs[i] = buf_init(1024);
+                fcntl(ins[i], F_SETFL, O_NONBLOCK); /* set input pipes to non-blocking mode */
         }
         char **ptrs = (char **) malloc(split->chunks_num * sizeof (char *));
 
@@ -148,7 +152,69 @@ static inline void cmrmap_create_resender(struct cmr_config *cfg, struct cmr_spl
 
         exit(0);
 }
+#if 0
+static inline void cmrmap_create_stream_resender(struct cmr_config *cfg, struct cmr_split *split, struct cmr_map_output *maps, int *ins)
+{
+        pid_t p = fork();
 
+        if (p) {
+                fprintf(stderr, " [MAP] Stream resender node started with PID %d\n", p);
+                return;
+        }
+
+        clock_t timer = clock();
+
+        /* child process over there */
+
+        struct buffer **bufs = (struct buffer **) malloc(split->chunks_num * sizeof (struct buffer *));
+        for (int i=0; i<split->chunks_num; i++) {
+                bufs[i] = buf_init(1024);
+                fcntl(ins[i], F_SETFL, O_NONBLOCK); /* set input pipes to non-blocking mode */
+        }
+        char **ptrs = (char **) malloc(split->chunks_num * sizeof (char *));
+
+        char lbuf[1024];
+        int str_count = split->str_num;
+
+        while (!feof(stdin)) {
+                for (int i = 0; i < map->nodes_num; i++) {
+                        if (eofs[i]) /* if current stream is ended */
+                                continue;
+
+                        /* If buffer is free, just fill it with values from chunk */
+                        if (buf_is_free(bufs[i])) {
+                                int len = cmr_read_chunk(&split->chunks[i], lbuf, 1024);
+                                if (len <= 0) { /* EOF */
+                                        eofs[i] = 1;
+                                        buf_free(bufs[i]);
+                                        close(ins[i]);
+                                        continue;
+                                }
+                                
+                                buf_attach(bufs[i], lbuf, len);
+                                ptrs[i] = NULL;
+                        }
+
+                        /* Send data to mapper node */
+                        int str = cmrstream(ins[i], bufs[i]->buffer, bufs[i]->pos, &ptrs[i]);
+                        if (str == 0) {
+                                fprintf(stderr, " [MAP] Reached end of stream\n");
+                                num_streams--;
+                                bufs[i]->pos = 0; /* end of stream */
+                        } else if (str == -1) { /* stream error */
+                                perror(" [MAP] Error streaming chunk: ");
+                        }
+                }
+        }
+
+        fprintf(stderr, " [MAP] Close resender node, time %.4lf\n", (double) (clock() - timer) / CLOCKS_PER_SEC);
+        free(ptrs);
+        free(eofs);
+        free(bufs);
+
+        exit(0);
+}
+#endif
 struct cmr_map_output *cmrmap(struct cmr_split *split, struct cmr_config *cfg)
 {
         fprintf(stderr, " [MAP] Create %d map nodes\n", split->chunks_num);
@@ -167,7 +233,6 @@ struct cmr_map_output *cmrmap(struct cmr_split *split, struct cmr_config *cfg)
         for (int i = 0; i < split->chunks_num; i++) {
                 pipe(infd);
                 pipe(outfd);
-                fcntl(infd[1], F_SETFL, O_NONBLOCK); /* set input pipe to non-blocking mode */
                 
                 ins[i] = infd[1];
 
@@ -175,22 +240,25 @@ struct cmr_map_output *cmrmap(struct cmr_split *split, struct cmr_config *cfg)
                 ret->nodes[i] = fork();
 
                 if (ret->nodes[i] == 0) { /* node */
-                        close(ins[i]); /* close input pipe */
+                        for (int j = 0; j <= i; j++)
+                                close(ins[j]); /* close input pipe */
                         if (split->source == SPLIT_FILES)
                                 lseek(split->chunks[i].fd, split->chunks[i].start, SEEK_SET);
 
                         cmrmap_create_node(i, cfg, &split->chunks[i], infd[0], outfd[1]);
                 }
+                close(outfd[1]);
                 
                 fprintf(stderr, " [MAP] Node %d started with PID %d\n", i, ret->nodes[i]);
         }
 
         /* 2. Create resender node */
-        cmrmap_create_resender(cfg, split, ret, ins);
+        cmrmap_create_file_resender(cfg, split, ret, ins);
 
         /* 3. Close input pipes for not to confuse mappers */
-        for (int i = 0; i < split->chunks_num; i++)
+        for (int i = 0; i < split->chunks_num; i++) {
                 close(ins[i]);
+        }
         free(ins);
 
         /* Now parser nodes will deal with data, so just return node list */
