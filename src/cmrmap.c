@@ -22,7 +22,7 @@ static void emit_keyvalue(char *key, char *value)
 
         int val_len = strlen(value);
         printf("w%d %d %s%s", key_len + val_len, key_len, key, value);
-        fprintf(stderr, "Emit keyvalue: %d %d %s%s\n", key_len + val_len, key_len, key, value);
+        //fprintf(stderr, "Emit keyvalue: %d %d %s%s\n", key_len + val_len, key_len, key, value);
 }
 
 static void cmrmap_create_node(int node_id, struct cmr_config *cfg, struct cmr_chunk *chunk, int in_fd, int out_fd)

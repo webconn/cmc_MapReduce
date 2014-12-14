@@ -14,14 +14,15 @@
 #include "cmrreduce.h"
 #include "config.h"
 
-static int get_hash(const char *key)
+static unsigned int get_hash(const char *key)
 {
-        int sum = 0;
-        int mul = 1;
+        unsigned int sum = 0;
+        unsigned int mul = 1;
 
         while (*key != '\0') {
                 sum += *key * mul;
                 mul *= CONFIG_DFL_HASH_SEED;
+                key++;
         }
 
         return sum % CONFIG_DFL_HASHTABLE_SIZE;
@@ -30,11 +31,20 @@ static int get_hash(const char *key)
 static void hashtable_insert(struct cmr_hashtable_key *hashtable, char *key, char *value)
 {
         int hash = get_hash(key);
+        //fprintf(stderr, "Pair <\"%s\", \"%s\">: hash %d\n", key, value, hash); 
 
         struct cmr_hashtable_key *elem = &hashtable[hash];
 
-        while (elem->key != NULL && strcmp(elem->key, key) != 0 && elem->next != NULL)
-                elem = elem->next;
+        while (1) {
+                if (elem->key == NULL)
+                        break;
+                if (elem->next == NULL)
+                        break;
+
+                if (strcmp(elem->key, key) != 0)
+                        elem = elem->next;
+
+        }
 
         if (elem->key != NULL) {
                 if (strcmp(elem->key, key) == 0) { /* key found */
@@ -58,6 +68,7 @@ static void hashtable_insert(struct cmr_hashtable_key *hashtable, char *key, cha
 
         elem->tail->value = value;
         elem->tail->next = NULL;
+        elem->num_values++;
 }
 
 pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
@@ -100,6 +111,7 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
                                 continue; 
 
                         int r = 0;
+                        errno = 0;
                         if ((r = getc(pipes[i])) <= 0) {
                                 if (r == EOF) { /* end of input stream */
                                         if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -107,14 +119,14 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
                                                 continue; /* just avoid blocking */
                                         }
 
-                                        fprintf(stderr, " [SHUFFLER] Got EOF?\n");
+                                        fprintf(stderr, " [SHUFFLER] Got EOF\n");
                                         eofs[i] = 1;
                                         fclose(pipes[i]);
                                         num_inputs--;
                                         continue;
                                 } else {
-                                                perror(" [SHUFFLER] Error reading from pipe");
-                                                exit(1);
+                                        perror(" [SHUFFLER] Error reading from pipe");
+                                        exit(1);
                                 }
                         }
 
@@ -138,8 +150,8 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
                         fread(value, lbuf.full_size - lbuf.key_size, 1, pipes[i]); /* read value */
                         value[lbuf.full_size - lbuf.key_size] = '\0';
 
-                        fprintf(stderr, "Got keyvalue: <\"%s\", \"%s\">\n", key, value);
-                        //hashtable_insert(hashtable, key, value);
+                        //fprintf(stderr, "Got keyvalue: <\"%s\", \"%s\">\n", key, value);
+                        hashtable_insert(hashtable, key, value);
 
                         /* Set non-blocking flag again */
                         fcntl(map->outs[i], F_SETFL, oldflg | O_NONBLOCK);
