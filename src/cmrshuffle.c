@@ -28,9 +28,9 @@ static unsigned int get_hash(const char *key)
         return sum % CONFIG_DFL_HASHTABLE_SIZE;
 }
 
-static void hashtable_insert(struct cmr_hashtable_key *hashtable, char *key, char *value)
+static inline void hashtable_insert(struct cmr_hashtable_key *hashtable, char *key, char *value)
 {
-        int hash = get_hash(key);
+        unsigned int hash = get_hash(key);
         //fprintf(stderr, "Pair <\"%s\", \"%s\">: hash %d\n", key, value, hash); 
 
         struct cmr_hashtable_key *elem = &hashtable[hash];
@@ -41,9 +41,11 @@ static void hashtable_insert(struct cmr_hashtable_key *hashtable, char *key, cha
                 if (elem->next == NULL)
                         break;
 
-                if (strcmp(elem->key, key) != 0)
+                if (strcmp(elem->key, key) != 0) {
                         elem = elem->next;
-
+                } else {
+                        break;
+                }
         }
 
         if (elem->key != NULL) {
@@ -53,6 +55,8 @@ static void hashtable_insert(struct cmr_hashtable_key *hashtable, char *key, cha
                         elem->next = (struct cmr_hashtable_key *) malloc(sizeof (struct cmr_hashtable_key));
                         elem = elem->next;
                         elem->key = key;
+                        elem->num_values = 0;
+                        elem->next = NULL;
                 }
         } else { /* no keys with this hash */
                 elem->key = key;
@@ -69,6 +73,19 @@ static void hashtable_insert(struct cmr_hashtable_key *hashtable, char *key, cha
         elem->tail->value = value;
         elem->tail->next = NULL;
         elem->num_values++;
+}
+
+static inline void emit_keyvalues(FILE *stream, struct cmr_hashtable_key *val)
+{
+        int key_len = strlen(val->key);
+        fprintf(stream, "w%d %s", key_len, val->key);
+        fprintf(stream, " %d ", val->num_values);
+
+        struct cmr_hashtable_value_item *elem = val->values;
+        while (elem != NULL) {
+                fprintf(stream, "%d %s", (int) strlen(elem->value), elem->value);
+                elem = elem->next;
+        }
 }
 
 pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
@@ -158,21 +175,51 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
                 }
         }
 
-        /* Parse hashtable and send data to reducers */
         /* Now for debugging: view hash table */
+        /*for (int i=0; i<CONFIG_DFL_HASHTABLE_SIZE; i++) {
+                if (hashtable[i].key == NULL)
+                        continue;
+                
+                struct cmr_hashtable_key *elem = &hashtable[i];
+                while (elem != NULL) {
+                        fprintf(stderr, "(Hash %d) Key \"%s\", values: (%d) { ", i, elem->key, elem->num_values);
+
+                        struct cmr_hashtable_value_item *start = elem->values;
+                        while (start != NULL) {
+                                fprintf(stderr, "\"%s\" ", start->value);
+                                start = start->next;
+                        }
+                        fprintf(stderr, "}\n");
+                        elem = elem->next;
+                }
+        }*/
+
+        free(pipes);
+        free(eofs);
+
+        pipes = (FILE **) malloc(reduce->reducers_num * sizeof (FILE *));
+        for (int i = 0; i < reduce->reducers_num; i++) {
+                pipes[i] = fdopen(reduce->ins[i], "w");
+        }
+
+        /* Parse hashtable and send data to reducers */
+
         for (int i=0; i<CONFIG_DFL_HASHTABLE_SIZE; i++) {
                 if (hashtable[i].key == NULL)
                         continue;
 
-                fprintf(stderr, "Key \"%s\", values: (%d) { ", hashtable[i].key, hashtable[i].num_values);
-
-                struct cmr_hashtable_value_item *start = hashtable[i].values;
-                while (start != NULL) {
-                        fprintf(stderr, "\"%s\" ", start->value);
-                        start = start->next;
+                struct cmr_hashtable_key *elem = &hashtable[i];
+                while (elem != NULL) {
+                        /* Emit key-values */
+                        emit_keyvalues(pipes[i % reduce->reducers_num], elem);
+                        elem = elem->next;
                 }
-                fprintf(stderr, "}\n");
         }
+
+        for (int i = 0; i < reduce->reducers_num; i++) {
+                fclose(pipes[i]);
+        }
+        free(pipes);
 
         fprintf(stderr, " [SHUFFLE] Shuffler exit normally, time %.4lf\n", (double) (clock() - timer) / CLOCKS_PER_SEC);
         exit(0);

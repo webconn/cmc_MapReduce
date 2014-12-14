@@ -8,6 +8,7 @@
 #include "cmrreduce.h"
 #include "cmrshuffle.h"
 #include "cmrmap.h"
+#include "cmrmerge.h"
 #include "cmrio.h"
 #include "ui.h"
 
@@ -34,6 +35,8 @@ int main(int argc, char *argv[])
         /* Create shuffler to connect mappers and reducers */
         cmrshuffle(map, reduce);
 
+        /* Start merger to receive strings from reducers */
+        cmrmerge(reduce);
 
         while (wait(NULL) >= 0);
 

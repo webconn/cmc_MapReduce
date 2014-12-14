@@ -41,6 +41,7 @@ struct cmr_reduce_output *cmrreduce(struct cmr_config *cfg)
                                 close(ret->ins[j]);
                         create_reducer_node(cfg, infd[0], outfd[1]);
                 }
+                close(outfd[1]);
                 fprintf(stderr, " [REDUCE] Run reducer node %d, PID %d\n", i, ret->reducers[i]);
         }
 
