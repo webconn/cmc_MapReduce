@@ -35,7 +35,7 @@ void cmrmerge(struct cmr_reduce_output *reduce)
                                                 continue; /* just avoid blocking */
                                         }
 
-                                        fprintf(stderr, " [MERGER] Got EOF\n");
+                                        //fprintf(stderr, " [MERGER] Got EOF\n");
                                         eofs[i] = 1;
                                         fclose(outputs[i]);
                                         num_streams--;
@@ -57,7 +57,7 @@ void cmrmerge(struct cmr_reduce_output *reduce)
                         char *res = NULL;
                         do {
                                 res = fgets(buffer, 1023, outputs[i]);
-                                fprintf(stderr, " [MERGER] Get buffer: \"%s\"\n", res == NULL ? "EOF" : res);
+                                //fprintf(stderr, " [MERGER] Get buffer: \"%c%s\"\n", r, res == NULL ? "EOF" : res);
                                 fputs(buffer, stdout);
                                 len = strlen(buffer);
                         } while (res != NULL && buffer[len - 1] != '\n');

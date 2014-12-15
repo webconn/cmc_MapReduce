@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "config.h"
+
 void cmrconfig_free(struct cmr_config *f)
 {
         if (f->map_argv != NULL) {
@@ -32,6 +34,12 @@ void cmrconfig_free(struct cmr_config *f)
 
                 free(f->filenames);
         }
+
+        if ((char *) f->map_delims != (char *) CONFIG_DFL_MAP_DELIMS)
+                free(f->map_delims);
+
+        if ((char *) f->map_value != (char *) CONFIG_DFL_MAP_VALUE)
+                free(f->map_value);
 
         free(f);
 }

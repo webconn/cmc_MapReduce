@@ -82,6 +82,7 @@ inline static struct cmr_split *cmrsplit_local(struct cmr_config *cfg)
                 ret->chunks_num = cfg->map_num;
         } else {
                 fprintf(stderr, " [SPLIT] Run internal splitter for input files\n");
+                fprintf(stderr, " [SPLIT] Chunks per mapper summary:\n");
                 ret->source = SPLIT_FILES;
                 /* Calculate streams */
                 if (cfg->filenames_num == 1) { /* single file; split it! */
@@ -111,6 +112,9 @@ inline static struct cmr_split *cmrsplit_local(struct cmr_config *cfg)
                                 ret->chunks[i].fd = open(cfg->filenames[0], O_RDONLY);
                                 ret->chunks[i].start = start;
                                 ret->chunks[i].len = end - start;
+                                lseek(ret->chunks[i].fd, start, SEEK_SET);
+                                
+                                fprintf(stderr, " [SPLIT] == Node %d, file %s, start %lld, end %lld\n", i, cfg->filenames[0], (long long) start, (long long) end);
 
                                 start = end;
                                 end += piece_size;
@@ -133,6 +137,8 @@ inline static struct cmr_split *cmrsplit_local(struct cmr_config *cfg)
                                 ret->chunks[i].fd = fd;
                                 ret->chunks[i].start = 0;
                                 ret->chunks[i].len = len;
+                                
+                                fprintf(stderr, " [SPLIT] == Node %d, file %s, start %lld, end %lld\n", i, cfg->filenames[i], 0ll, (long long) len);
                         }
                 }
         }

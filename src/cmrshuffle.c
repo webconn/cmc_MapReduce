@@ -88,6 +88,32 @@ static inline void emit_keyvalues(FILE *stream, struct cmr_hashtable_key *val)
         }
 }
 
+static inline void hashtable_free(struct cmr_hashtable_key *hashtable)
+{
+        for (int i=0; i<CONFIG_DFL_HASHTABLE_SIZE; i++) {
+                if (hashtable[i].key == NULL)
+                        continue;
+
+                struct cmr_hashtable_key *elem = &hashtable[i];
+                while (elem != NULL) {
+                        struct cmr_hashtable_value_item *val = elem->values;
+                        while (val != NULL) {
+                                struct cmr_hashtable_value_item *f = val;
+                                val = val->next;
+                                free(f->value);
+                                free(f);
+                        }
+                        
+                        free(elem->key);
+                        struct cmr_hashtable_key *v = elem;
+                        elem = elem->next;
+                        if (v != &hashtable[i]) {
+                                free(v);
+                        }
+                }
+        }
+}
+
 pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
 {
         /* Our task is to create process which will interconnect mappers and reducers */
@@ -136,7 +162,7 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
                                                 continue; /* just avoid blocking */
                                         }
 
-                                        fprintf(stderr, " [SHUFFLER] Got EOF\n");
+                                        fprintf(stderr, " [SHUFFLER] Got EOF from node %d\n", i);
                                         eofs[i] = 1;
                                         fclose(pipes[i]);
                                         num_inputs--;
@@ -167,7 +193,7 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
                         fread(value, lbuf.full_size - lbuf.key_size, 1, pipes[i]); /* read value */
                         value[lbuf.full_size - lbuf.key_size] = '\0';
 
-                        //fprintf(stderr, "Got keyvalue: <\"%s\", \"%s\">\n", key, value);
+                        //fprintf(stderr, " [SHUFFLE] = Got keyvalue from node %d: <\"%s\", \"%s\">\n", i, key, value);
                         hashtable_insert(hashtable, key, value);
 
                         /* Set non-blocking flag again */
@@ -176,13 +202,14 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
         }
 
         /* Now for debugging: view hash table */
-        /*for (int i=0; i<CONFIG_DFL_HASHTABLE_SIZE; i++) {
+        #if 0
+        for (int i=0; i<CONFIG_DFL_HASHTABLE_SIZE; i++) {
                 if (hashtable[i].key == NULL)
                         continue;
                 
                 struct cmr_hashtable_key *elem = &hashtable[i];
                 while (elem != NULL) {
-                        fprintf(stderr, "(Hash %d) Key \"%s\", values: (%d) { ", i, elem->key, elem->num_values);
+                        fprintf(stderr, " [HASH] == (Hash %d) Key \"%s\", values: (%d) { ", i, elem->key, elem->num_values);
 
                         struct cmr_hashtable_value_item *start = elem->values;
                         while (start != NULL) {
@@ -192,7 +219,8 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
                         fprintf(stderr, "}\n");
                         elem = elem->next;
                 }
-        }*/
+        }
+        #endif
 
         free(pipes);
         free(eofs);
@@ -220,6 +248,7 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
                 fclose(pipes[i]);
         }
         free(pipes);
+        hashtable_free(hashtable);
 
         fprintf(stderr, " [SHUFFLE] Shuffler exit normally, time %.4lf\n", (double) (clock() - timer) / CLOCKS_PER_SEC);
         exit(0);

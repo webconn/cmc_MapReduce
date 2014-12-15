@@ -71,7 +71,7 @@ static void cmrmap_create_node(int node_id, struct cmr_config *cfg, struct cmr_c
                         buf_add(buf, c);
                 }
         }
-        fprintf(stderr, " [WRAPPER] Got EOF\n");
+        //fprintf(stderr, " [WRAPPER] Got EOF\n");
 
         if (!buf_is_free(buf)) /* send last element */
                 emit_keyvalue(buf_get(buf), cfg->map_value);
@@ -121,8 +121,11 @@ static inline void cmrmap_create_file_resender(struct cmr_config *cfg, struct cm
 
                         /* If buffer is free, just fill it with values from chunk */
                         if (buf_is_free(bufs[i])) {
+                                fprintf(stderr, " [RESENDER] Fill buffer %d\n", i);
                                 int len = cmr_read_chunk(&split->chunks[i], lbuf, 1024);
                                 if (len <= 0) { /* EOF */
+                                        fprintf(stderr, " [RESENDER] Reached EOF in %d\n", i);
+                                        num_streams--;
                                         eofs[i] = 1;
                                         buf_free(bufs[i]);
                                         close(ins[i]);
@@ -131,14 +134,14 @@ static inline void cmrmap_create_file_resender(struct cmr_config *cfg, struct cm
                                 
                                 buf_attach(bufs[i], lbuf, len);
                                 ptrs[i] = NULL;
+                                fprintf(stderr, " [RESENDER] Buffer %d filled, size %d\n", i, len);
                         }
 
                         /* Send data to mapper node */
                         int str = cmrstream(ins[i], bufs[i]->buffer, bufs[i]->pos, &ptrs[i]);
                         if (str == 0) {
-                                fprintf(stderr, " [MAP] Reached end of stream\n");
-                                num_streams--;
-                                bufs[i]->pos = 0; /* end of stream */
+                                fprintf(stderr, " [RESENDER] Buffer %d is empty\n", i);
+                                bufs[i]->pos = 0;
                         } else if (str == -1) { /* stream error */
                                 perror(" [MAP] Error streaming chunk: ");
                         }
@@ -244,6 +247,8 @@ struct cmr_map_output *cmrmap(struct cmr_split *split, struct cmr_config *cfg)
                                 close(ins[j]); /* close input pipe */
                         if (split->source == SPLIT_FILES)
                                 lseek(split->chunks[i].fd, split->chunks[i].start, SEEK_SET);
+
+                        fprintf(stderr, " [MAP] Node %d: file %d, start %lld, len %lld\n", i, split->chunks[i].fd, (long long) split->chunks[i].start, (long long) split->chunks[i].len);
 
                         cmrmap_create_node(i, cfg, &split->chunks[i], infd[0], outfd[1]);
                 }

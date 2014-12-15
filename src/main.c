@@ -43,6 +43,7 @@ int main(int argc, char *argv[])
         cmrconfig_free(config);
         cmrmap_free(map);
         cmrsplit_free(split);
+        cmrreduce_free(reduce);
 
         return 0;
 }
