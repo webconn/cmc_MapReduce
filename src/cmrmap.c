@@ -121,7 +121,7 @@ static inline void cmrmap_create_file_resender(struct cmr_config *cfg, struct cm
 
                         /* If buffer is free, just fill it with values from chunk */
                         if (buf_is_free(bufs[i])) {
-                                fprintf(stderr, " [RESENDER] Fill buffer %d\n", i);
+                                //fprintf(stderr, " [RESENDER] Fill buffer %d\n", i);
                                 int len = cmr_read_chunk(&split->chunks[i], lbuf, 1024);
                                 if (len <= 0) { /* EOF */
                                         fprintf(stderr, " [RESENDER] Reached EOF in %d\n", i);
@@ -134,13 +134,13 @@ static inline void cmrmap_create_file_resender(struct cmr_config *cfg, struct cm
                                 
                                 buf_attach(bufs[i], lbuf, len);
                                 ptrs[i] = NULL;
-                                fprintf(stderr, " [RESENDER] Buffer %d filled, size %d\n", i, len);
+                                //fprintf(stderr, " [RESENDER] Buffer %d filled, size %d\n", i, len);
                         }
 
                         /* Send data to mapper node */
                         int str = cmrstream(ins[i], bufs[i]->buffer, bufs[i]->pos, &ptrs[i]);
                         if (str == 0) {
-                                fprintf(stderr, " [RESENDER] Buffer %d is empty\n", i);
+                                //fprintf(stderr, " [RESENDER] Buffer %d is empty\n", i);
                                 bufs[i]->pos = 0;
                         } else if (str == -1) { /* stream error */
                                 perror(" [MAP] Error streaming chunk: ");

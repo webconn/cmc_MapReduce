@@ -63,10 +63,10 @@ static inline void hashtable_insert(struct cmr_hashtable_key *hashtable, char *k
         }
 
         if (elem->tail == NULL) {
-                elem->values = (struct cmr_hashtable_value_item *) malloc(sizeof (struct cmr_hashtable_value_item));
+                elem->values = (struct cmr_hashtable_value_item *) calloc(1, sizeof (struct cmr_hashtable_value_item));
                 elem->tail = elem->values;
         } else {
-                elem->tail->next = (struct cmr_hashtable_value_item *) malloc(sizeof (struct cmr_hashtable_value_item));
+                elem->tail->next = (struct cmr_hashtable_value_item *) calloc(1, sizeof (struct cmr_hashtable_value_item));
                 elem->tail = elem->tail->next;
         }
 
@@ -134,6 +134,8 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
         int *eofs = (int *) malloc(map->nodes_num * sizeof (int));
         FILE **pipes = (FILE **) malloc(map->nodes_num * sizeof (FILE *));
         int num_inputs = map->nodes_num;
+
+        fprintf(stderr, " [SHUFFLER] Allocated memory for tables\n");
         
         /* First, make all inputs non-blocking, to avoid long locks */
         for (int i=0; i<map->nodes_num; i++) {
@@ -147,17 +149,29 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
                 int key_size;
         } lbuf = { 0 };
 
+        fprintf(stderr, " [SHUFFLER] Ready to deal with data\n");
 
+        int counter = 1;
+        long long heartbeats = 0;
         while (num_inputs > 0) {
+                counter--;
+                if (counter == 0) {
+                        fprintf(stderr, " [SHUFFLER] Heartbeat %lld\n", heartbeats++);
+                        counter = 50;
+                }
+
                 for (int i = 0; i < map->nodes_num; i++) {
                         if (eofs[i] == 1)
                                 continue; 
 
                         int r = 0;
                         errno = 0;
+
+                        //fprintf(stderr, " [SHUFFLER] Trying to get first symbol\n");
                         if ((r = getc(pipes[i])) <= 0) {
                                 if (r == EOF) { /* end of input stream */
                                         if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                                                //fprintf(stderr, " [SHUFFLER] Pipe is empty, waiting...\n");
                                                 errno = 0; /* spike but works */
                                                 continue; /* just avoid blocking */
                                         }
@@ -198,8 +212,10 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
 
                         /* Set non-blocking flag again */
                         fcntl(map->outs[i], F_SETFL, oldflg | O_NONBLOCK);
+                        //fprintf(stderr, " [SHUFFLE] Ready to get next key\n");
                 }
         }
+        fprintf(stderr, " [SHUFFLER] Reading completed, send key-values to reducer nodes\n");
 
         /* Now for debugging: view hash table */
         #if 0

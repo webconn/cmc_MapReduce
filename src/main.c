@@ -38,6 +38,7 @@ int main(int argc, char *argv[])
         /* Start merger to receive strings from reducers */
         cmrmerge(reduce);
 
+        fprintf(stderr, " [CMAPREDUCE] Waiting for all child processes...\n");
         while (wait(NULL) >= 0);
 
         cmrconfig_free(config);
