@@ -7,7 +7,7 @@ INCLUDEDIR = include
 
 CC = gcc
 
-CFLAGS = -std=gnu99 -I$(INCLUDEDIR) -g -Wall -O2 -march=native -Wno-psabi
+CFLAGS = -std=gnu99 -I$(INCLUDEDIR) -g -Wall -O3 -march=native -Wno-psabi
 LDFLAGS = -lm -march=native
 
 OBJS := $(addprefix $(BUILDDIR)/, $(OBJS))
