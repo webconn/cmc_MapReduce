@@ -1,3 +1,11 @@
+#include "cmrsplit.h"
+
+/**
+ * @file src/cmrsplit.c
+ * @brief Splitter implementation
+ * @author WebConn
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -7,7 +15,6 @@
 #include <limits.h>
 #include <time.h>
 
-#include "cmrsplit.h"
 #include "cmrconfig.h"
 #include "cmrio.h"
 
@@ -284,6 +291,12 @@ inline static struct cmr_split *cmrsplit_external(struct cmr_config *cfg)
         return ret;
 }
 
+/**
+ * Split input data according to CMapReduce dynamic
+ * configuration
+ * @param cfg Pointer to configuration structure
+ * @return Pointer to split configuration structure
+ */
 struct cmr_split *cmrsplit(struct cmr_config *cfg)
 {
         if (cfg->split_argv != NULL) {
@@ -293,6 +306,11 @@ struct cmr_split *cmrsplit(struct cmr_config *cfg)
         }
 }
 
+/**
+ * Delete split configuration structure
+ * @param f Pointer to split configuration structure
+ * @return Nothing
+ */
 void cmrsplit_free(struct cmr_split *f)
 {
         if (f->source == SPLIT_FILES) {

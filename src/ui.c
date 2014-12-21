@@ -1,3 +1,11 @@
+#include "ui.h"
+
+/**
+ * @file src/ui.c
+ * @brief Console user interface (CLI) of CMapReduce
+ * @author WebConn
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,7 +15,6 @@
 #include <getopt.h>
 
 #include "generic.h"
-#include "ui.h"
 #include "config.h"
 #include "cmrconfig.h"
 
@@ -42,7 +49,7 @@ static const char *help_msg = "Usage: cmapreduce -M \"map command\" -R \"reduce 
         "     --unix-mapper-value=\"value\"\tDefault value for pairs got from UNIX wrapper\n"
         "     --unix-reducer\t\t\tEnable UNIX-compatible wrapper for reducer\n\n";
 
-void print_help(FILE *stream)
+static void print_help(FILE *stream)
 {
         fprintf(stream, help_msg, CONFIG_DFL_MAP_NUM, CONFIG_DFL_REDUCE_NUM); 
 }
@@ -101,6 +108,12 @@ static char **create_argv(char *str)
         return ret;
 }
 
+/**
+ * Parse command line arduments and create CMapReduce dynamic configuration structure
+ * @param argc argc from main()
+ * @param argv argv from main()
+ * @return Pointer to configuration structure
+ */
 struct cmr_config *ui_parse(int argc, char *argv[])
 {
         struct cmr_config *ret = (struct cmr_config *) malloc(sizeof (struct cmr_config));
@@ -188,7 +201,7 @@ struct cmr_config *ui_parse(int argc, char *argv[])
         if (!f_map || !f_reduce || f_exit) {
                 print_help(stderr);
                 cmrconfig_free(ret);
-                cmr_exit(1);
+                exit(1);
         }
 
         if (ret->filenames_num > 0) {
@@ -201,7 +214,7 @@ struct cmr_config *ui_parse(int argc, char *argv[])
                 if (lnum > 0)
                         ret->str_num = lnum;
                 else
-                        ret->str_num = CONFIG_DFL_STR_NUM;
+                        ret->str_num = 1;
         }
 
         return ret;

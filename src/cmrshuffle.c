@@ -1,5 +1,11 @@
 #include "cmrshuffle.h"
 
+/**
+ * @file src/cmrshuffle.c
+ * @brief Shuffle stage (between Map and Reduce)
+ * @author WebConn
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,6 +20,20 @@
 #include "cmrreduce.h"
 #include "config.h"
 
+/** Value nodes of Shuffle hashtable */
+struct cmr_hashtable_value_item {
+        char *value;                                    /**< value */
+        struct cmr_hashtable_value_item *next;          /**< next value in list */
+};
+
+/** Key nodes of Shuffle hashtable */
+struct cmr_hashtable_key {
+        char *key;                                      /**< key */
+        int num_values;                                 /**< number of values for this key */
+        struct cmr_hashtable_value_item *values;        /**< list of values */
+        struct cmr_hashtable_value_item *tail;          /**< tail of list of values */
+        struct cmr_hashtable_key *next;                 /**< next key in list */
+};
 
 static void **heap = NULL;
 static int heap_num_chunks = 0;
@@ -146,6 +166,12 @@ static inline void emit_keyvalues(FILE *stream, struct cmr_hashtable_key *val)
         }
 }
 
+/**
+ * Create and configure Shuffle node
+ * @param map Pointer to Map stage output structure
+ * @param reduce Pointer to Reduce stage output structure
+ * @return PID of Shuffle node
+ */
 pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
 {
         /* Our task is to create process which will interconnect mappers and reducers */

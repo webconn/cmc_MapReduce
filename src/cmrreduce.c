@@ -1,5 +1,11 @@
 #include "cmrreduce.h"
 
+/**
+ * @file src/cmrreduce.c
+ * @brief Reduce stage
+ * @author WebConn
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,6 +23,11 @@ static inline void create_reducer_node(struct cmr_config *cfg, int in_fd, int ou
         exit(1);
 }
 
+/**
+ * Create Reduce nodes and configure inputs and outputs
+ * @param cfg Pointer to Dynamic CMapReduce configuration structure
+ * @return Pointer to Reduce stage output structure
+ */
 struct cmr_reduce_output *cmrreduce(struct cmr_config *cfg)
 {
         struct cmr_reduce_output *ret = (struct cmr_reduce_output *) malloc(sizeof (struct cmr_reduce_output));
@@ -48,6 +59,11 @@ struct cmr_reduce_output *cmrreduce(struct cmr_config *cfg)
         return ret;
 }
 
+/**
+ * Delete Reduce stage output structure
+ * @param r Pointer to Reduce stage output structure
+ * @return Nothing
+ */
 void cmrreduce_free(struct cmr_reduce_output *r)
 {
         free(r->reducers);

@@ -1,3 +1,9 @@
+/**
+ * @file src/main.c
+ * @brief CMapReduce bootstrap
+ * @author WebConn
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/wait.h>

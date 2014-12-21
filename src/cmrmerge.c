@@ -1,5 +1,11 @@
 #include "cmrmerge.h"
 
+/**
+ * @file src/cmrmerge.c
+ * @brief Merge procedure for Reduce stage
+ * @author WebConn
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,6 +13,15 @@
 #include <fcntl.h>
 #include <errno.h>
 
+/**
+ * Basic merger of reducers' output streams
+ *
+ * Get strings from each reducer and redirect 'em
+ * to stdout
+ *
+ * @param reduce Reduce stage output structure
+ * @return Nothing
+ */
 void cmrmerge(struct cmr_reduce_output *reduce)
 {
         FILE **outputs = (FILE **) malloc(reduce->reducers_num * sizeof (FILE *));

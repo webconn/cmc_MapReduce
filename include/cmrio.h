@@ -1,6 +1,12 @@
 #ifndef INCLUDE_CMRIO_H
 #define INCLUDE_CMRIO_H
 
+/**
+ * @file include/cmrio.h
+ * @brief Basic input/output operations
+ * @author WebConn
+ */
+
 #include <sys/types.h>
 
 #include "cmrsplit.h"
