@@ -14,7 +14,6 @@
 #define _GNU_SOURCE
 #include <getopt.h>
 
-#include "generic.h"
 #include "config.h"
 #include "cmrconfig.h"
 

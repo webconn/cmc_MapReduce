@@ -28,5 +28,8 @@ $(BUILDDIR)/%.o: $(SRCDIR)/%.c
 docs:
 	doxygen
 
+tests:
+
+
 clean:
-	rm $(TARGET) $(BUILDDIR) -rf
+	rm $(TARGET) $(BUILDDIR) doc -rf

@@ -330,6 +330,6 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
         free(pipes);
         heap_free();
 
-        fprintf(stderr, " [SHUFFLE] Shuffler exit normally, time %.4lf\n", (double) (clock() - timer) / CLOCKS_PER_SEC);
+        fprintf(stderr, " [SHUFFLE] Shuffler exit normally, time %.4lf, memory usage %lld bytes\n", (double) (clock() - timer) / CLOCKS_PER_SEC, heap_size);
         exit(0);
 }
