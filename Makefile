@@ -25,5 +25,8 @@ $(BUILDDIR):
 $(BUILDDIR)/%.o: $(SRCDIR)/%.c
 	$(CC) -c -o $@ $^ $(CFLAGS)
 
+docs:
+	doxygen
+
 clean:
 	rm $(TARGET) $(BUILDDIR) -rf
