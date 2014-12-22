@@ -1,10 +1,21 @@
 #include "cmrconfig.h"
 
+/**
+ * @file src/cmrconfig.c
+ * @brief CMapReduce dynamic configuration manager
+ * @author WebConn
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "config.h"
 
+/**
+ * Delete configuration structure
+ * @param f Pointer to configuration structure
+ * @return Nothing
+ */
 void cmrconfig_free(struct cmr_config *f)
 {
         if (f->map_argv != NULL) {

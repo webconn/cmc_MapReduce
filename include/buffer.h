@@ -1,10 +1,18 @@
 #ifndef INCLUDE_BUFFER_H
 #define INCLUDE_BUFFER_H
 
+/**
+ * @file include/buffer.h
+ * @brief Dynamically resizeable buffer definition
+ * @author WebConn
+ */
+
+
+/** Dynamically resizeable buffer structure */
 struct buffer {
-        int pos;
-        int size;
-        char *buffer;
+        int pos;        /**< Current position in buffer */
+        int size;       /**< Buffer size */
+        char *buffer;   /**< Buffer data field */
 };
 
 struct buffer *buf_init(int init_len);

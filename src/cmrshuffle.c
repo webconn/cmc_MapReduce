@@ -1,5 +1,11 @@
 #include "cmrshuffle.h"
 
+/**
+ * @file src/cmrshuffle.c
+ * @brief Shuffle stage (between Map and Reduce)
+ * @author WebConn
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,6 +19,78 @@
 #include "cmrmap.h"
 #include "cmrreduce.h"
 #include "config.h"
+
+/** Value nodes of Shuffle hashtable */
+struct cmr_hashtable_value_item {
+        char *value;                                    /**< value */
+        struct cmr_hashtable_value_item *next;          /**< next value in list */
+};
+
+/** Key nodes of Shuffle hashtable */
+struct cmr_hashtable_key {
+        char *key;                                      /**< key */
+        int num_values;                                 /**< number of values for this key */
+        struct cmr_hashtable_value_item *values;        /**< list of values */
+        struct cmr_hashtable_value_item *tail;          /**< tail of list of values */
+        struct cmr_hashtable_key *next;                 /**< next key in list */
+};
+
+static void **heap = NULL;
+static int heap_num_chunks = 0;
+static long long heap_size = 0;
+
+static void *malloc_heap(int size)
+{
+        //fprintf(stderr, "  [MALLOC] Allocate %d, heap size %lld\n", size, heap_size);
+
+        if (size <= 0)
+                return NULL;
+
+        if (heap == NULL) {
+                heap = malloc(CONFIG_DFL_HEAPTABLE_ROW * sizeof (void *));
+                memset(heap, 0, CONFIG_DFL_HEAPTABLE_ROW * sizeof (void *));
+                heap_num_chunks = CONFIG_DFL_HEAPTABLE_ROW;
+        }
+
+        int tail = (heap_size + size) % CONFIG_DFL_HEAP_CHUNK_SIZE;
+        if (tail < size) { /* if there's no space in the tail of last chunk */
+                heap_size += size - tail;
+        }
+
+        int chunk_id = heap_size / CONFIG_DFL_HEAP_CHUNK_SIZE;
+        if (chunk_id >= heap_num_chunks) { /* need more chunk rows */
+                heap_num_chunks *= 2;
+                heap = realloc(heap, heap_num_chunks * CONFIG_DFL_HEAPTABLE_ROW);
+                memset(heap + (heap_num_chunks / 2), 0, (heap_num_chunks / 2) * sizeof (void *));
+                if (heap == NULL) {
+                        perror(" [SHUFFLER] Error allocating memory\n");
+                        exit(1);
+                }
+        }
+
+        if (heap[chunk_id] == NULL) {
+                heap[chunk_id] = malloc(CONFIG_DFL_HEAP_CHUNK_SIZE);
+                if (heap[chunk_id] == NULL) {
+                        perror(" [SHUFFLER] Error allocating memory\n");
+                        exit(1);
+                }
+        }
+
+        void *ret = (char *) heap[chunk_id] + heap_size % CONFIG_DFL_HEAP_CHUNK_SIZE;
+        heap_size += size;
+
+
+        return ret;
+}
+
+static void heap_free(void)
+{
+        for (int i=0; i<heap_num_chunks; i++) {
+                if (heap[i] != NULL)
+                        free(heap[i]);
+        }
+        free(heap);
+}
 
 static unsigned int get_hash(const char *key)
 {
@@ -49,24 +127,24 @@ static inline void hashtable_insert(struct cmr_hashtable_key *hashtable, char *k
         }
 
         if (elem->key != NULL) {
-                if (strcmp(elem->key, key) == 0) { /* key found */
-                        free(key);
-                } else { /* key is not found */
-                        elem->next = (struct cmr_hashtable_key *) malloc(sizeof (struct cmr_hashtable_key));
+                if (strcmp(elem->key, key) != 0) { /* key is not found */
+                        elem->next = (struct cmr_hashtable_key *) malloc_heap(sizeof (struct cmr_hashtable_key));
                         elem = elem->next;
-                        elem->key = key;
+                        elem->key = (char *) malloc_heap(strlen(key) + 1);
+                        strcpy(elem->key, key);
                         elem->num_values = 0;
                         elem->next = NULL;
                 }
         } else { /* no keys with this hash */
-                elem->key = key;
+                elem->key = (char *) malloc_heap(strlen(key) + 1);
+                strcpy(elem->key, key);
         }
 
         if (elem->tail == NULL) {
-                elem->values = (struct cmr_hashtable_value_item *) calloc(1, sizeof (struct cmr_hashtable_value_item));
+                elem->values = (struct cmr_hashtable_value_item *) malloc_heap(sizeof (struct cmr_hashtable_value_item));
                 elem->tail = elem->values;
         } else {
-                elem->tail->next = (struct cmr_hashtable_value_item *) calloc(1, sizeof (struct cmr_hashtable_value_item));
+                elem->tail->next = (struct cmr_hashtable_value_item *) malloc_heap(sizeof (struct cmr_hashtable_value_item));
                 elem->tail = elem->tail->next;
         }
 
@@ -88,32 +166,12 @@ static inline void emit_keyvalues(FILE *stream, struct cmr_hashtable_key *val)
         }
 }
 
-static inline void hashtable_free(struct cmr_hashtable_key *hashtable)
-{
-        for (int i=0; i<CONFIG_DFL_HASHTABLE_SIZE; i++) {
-                if (hashtable[i].key == NULL)
-                        continue;
-
-                struct cmr_hashtable_key *elem = &hashtable[i];
-                while (elem != NULL) {
-                        struct cmr_hashtable_value_item *val = elem->values;
-                        while (val != NULL) {
-                                struct cmr_hashtable_value_item *f = val;
-                                val = val->next;
-                                free(f->value);
-                                free(f);
-                        }
-                        
-                        free(elem->key);
-                        struct cmr_hashtable_key *v = elem;
-                        elem = elem->next;
-                        if (v != &hashtable[i]) {
-                                free(v);
-                        }
-                }
-        }
-}
-
+/**
+ * Create and configure Shuffle node
+ * @param map Pointer to Map stage output structure
+ * @param reduce Pointer to Reduce stage output structure
+ * @return PID of Shuffle node
+ */
 pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
 {
         /* Our task is to create process which will interconnect mappers and reducers */
@@ -157,7 +215,7 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
                 counter--;
                 if (counter == 0) {
                         fprintf(stderr, " [SHUFFLER] Heartbeat %lld\n", heartbeats++);
-                        counter = 50;
+                        counter = 5000;
                 }
 
                 for (int i = 0; i < map->nodes_num; i++) {
@@ -199,7 +257,7 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
 
                         /* Allocate memory for buffer */
                         char *key = (char *) malloc((lbuf.key_size + 1) * sizeof (char));
-                        char *value = (char *) malloc((lbuf.full_size - lbuf.key_size + 1) * sizeof (char));
+                        char *value = (char *) malloc_heap((lbuf.full_size - lbuf.key_size + 1) * sizeof (char));
                         
                         fread(key, lbuf.key_size, 1, pipes[i]); /* read key */
                         key[lbuf.key_size] = '\0';
@@ -209,6 +267,7 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
 
                         //fprintf(stderr, " [SHUFFLE] = Got keyvalue from node %d: <\"%s\", \"%s\">\n", i, key, value);
                         hashtable_insert(hashtable, key, value);
+                        free(key);
 
                         /* Set non-blocking flag again */
                         fcntl(map->outs[i], F_SETFL, oldflg | O_NONBLOCK);
@@ -254,6 +313,11 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
 
                 struct cmr_hashtable_key *elem = &hashtable[i];
                 while (elem != NULL) {
+                        counter--;
+                        if (counter == 0) {
+                                fprintf(stderr, " [SHUFFLER] Heartbeat %lld\n", heartbeats++);
+                                counter = 5000;
+                        }
                         /* Emit key-values */
                         emit_keyvalues(pipes[i % reduce->reducers_num], elem);
                         elem = elem->next;
@@ -264,8 +328,8 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
                 fclose(pipes[i]);
         }
         free(pipes);
-        hashtable_free(hashtable);
+        heap_free();
 
-        fprintf(stderr, " [SHUFFLE] Shuffler exit normally, time %.4lf\n", (double) (clock() - timer) / CLOCKS_PER_SEC);
+        fprintf(stderr, " [SHUFFLE] Shuffler exit normally, time %.4lf, memory usage %lld bytes\n", (double) (clock() - timer) / CLOCKS_PER_SEC, heap_size);
         exit(0);
 }
