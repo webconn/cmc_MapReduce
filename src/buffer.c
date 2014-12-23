@@ -24,7 +24,7 @@ struct buffer *buf_init(int init_len)
         return ret;
 }
 
-static inline void buf_expand(struct buffer *buf)
+static inline void _buf_expand(struct buffer *buf)
 {
         buf->size *= 2;
         buf->buffer = (char *) malloc(buf->size * sizeof (char));
@@ -50,7 +50,7 @@ void buf_add(struct buffer *buf, char val)
 {
         buf->buffer[buf->pos++] = val;
         if (buf->pos == buf->size)
-                buf_expand(buf);
+                _buf_expand(buf);
 }
 
 /**
@@ -63,9 +63,21 @@ void buf_add(struct buffer *buf, char val)
 void buf_attach(struct buffer *buf, const char *val, int len)
 {
         while (buf->pos + len > buf->size)
-                buf_expand(buf);
+                _buf_expand(buf);
         memcpy(&buf->buffer[buf->pos], val, len);
         buf->pos += len;
+}
+
+/**
+ * Expand buffer size
+ * @param buf Pointer to buffer
+ * @param size Size of extra space required
+ * @return Nothing
+ */
+void buf_expand(struct buffer *buf, int size)
+{
+        while (buf->pos + size > buf->size)
+                _buf_expand(buf);
 }
 
 /**

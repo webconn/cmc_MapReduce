@@ -19,10 +19,12 @@
 #include "cmrmap.h"
 #include "cmrreduce.h"
 #include "config.h"
+#include "buffer.h"
 
 /** Value nodes of Shuffle hashtable */
 struct cmr_hashtable_value_item {
         char *value;                                    /**< value */
+        int num_repeats;                                /**< number of repeats of this key */
         struct cmr_hashtable_value_item *next;          /**< next value in list */
 };
 
@@ -140,6 +142,44 @@ static inline void hashtable_insert(struct cmr_hashtable_key *hashtable, char *k
                 strcpy(elem->key, key);
         }
 
+        struct cmr_hashtable_value_item *val = elem->values;
+        if (val == NULL) { /* no keys at all */
+                elem->values = (struct cmr_hashtable_value_item *) malloc_heap(sizeof (struct cmr_hashtable_value_item));
+                val = elem->values;
+                val->next = NULL;
+                val->value = (char *) malloc_heap(strlen(value) + 1);
+                strcpy(val->value, value);
+                val->num_repeats = 1;
+                elem->num_values = 1;
+        } else {
+                struct cmr_hashtable_value_item *prev = val;
+                val = val->next;
+
+                if (val == NULL && !strcmp(prev->value, value)) {
+                        prev->num_repeats++;
+                        return;
+                }
+
+                while (val != NULL) {
+                        if (!strcmp(val->value, value))
+                                break;
+                        prev = val;
+                        val = val->next;
+                }
+
+                if (val == NULL) { /* no such value in list */
+                        prev->next = (struct cmr_hashtable_value_item *) malloc_heap(sizeof (struct cmr_hashtable_value_item));
+                        prev = prev->next;
+                        prev->value = (char *) malloc_heap(strlen(value) + 1);
+                        prev->next = NULL;
+                        strcpy(prev->value, value);
+                        prev->num_repeats = 1;
+                        elem->num_values++;
+                } else { /* found value */
+                        val->num_repeats++;
+                }
+        }
+        /*
         if (elem->tail == NULL) {
                 elem->values = (struct cmr_hashtable_value_item *) malloc_heap(sizeof (struct cmr_hashtable_value_item));
                 elem->tail = elem->values;
@@ -148,20 +188,31 @@ static inline void hashtable_insert(struct cmr_hashtable_key *hashtable, char *k
                 elem->tail = elem->tail->next;
         }
 
-        elem->tail->value = value;
+        elem->tail->value = (char *) malloc_heap(strlen(value) + 1);
+        strcpy(elem->tail->value, value);
         elem->tail->next = NULL;
         elem->num_values++;
+        */
 }
 
 static inline void emit_keyvalues(FILE *stream, struct cmr_hashtable_key *val)
 {
         int key_len = strlen(val->key);
         fprintf(stream, "w%d %s", key_len, val->key);
-        fprintf(stream, " %d ", val->num_values);
-
+        
+        int val_sum = 0;
         struct cmr_hashtable_value_item *elem = val->values;
         while (elem != NULL) {
-                fprintf(stream, "%d %s", (int) strlen(elem->value), elem->value);
+                val_sum += elem->num_repeats;
+                elem = elem->next;
+        }
+
+        fprintf(stream, " %d ", val_sum);
+
+        elem = val->values;
+        while (elem != NULL) {
+                for (int j = 0; j < elem->num_repeats; j++)
+                        fprintf(stream, "%d %s", (int) strlen(elem->value), elem->value);
                 elem = elem->next;
         }
 }
@@ -211,6 +262,10 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
 
         int counter = 1;
         long long heartbeats = 0;
+
+        struct buffer *key_buf = buf_init(1024);
+        struct buffer *val_buf = buf_init(1024);
+
         while (num_inputs > 0) {
                 counter--;
                 if (counter == 0) {
@@ -256,9 +311,14 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
                         fgetc(pipes[i]); /* skip extra space symbol */
 
                         /* Allocate memory for buffer */
-                        char *key = (char *) malloc((lbuf.key_size + 1) * sizeof (char));
-                        char *value = (char *) malloc_heap((lbuf.full_size - lbuf.key_size + 1) * sizeof (char));
+                        char *key = key_buf->buffer;
+                        char *value = val_buf->buffer;
                         
+                        buf_reset(key_buf);
+                        buf_reset(val_buf);
+                        buf_expand(key_buf, lbuf.key_size + 1);
+                        buf_expand(val_buf, lbuf.full_size - lbuf.key_size + 1);
+
                         fread(key, lbuf.key_size, 1, pipes[i]); /* read key */
                         key[lbuf.key_size] = '\0';
 
@@ -267,13 +327,15 @@ pid_t cmrshuffle(struct cmr_map_output *map, struct cmr_reduce_output *reduce)
 
                         //fprintf(stderr, " [SHUFFLE] = Got keyvalue from node %d: <\"%s\", \"%s\">\n", i, key, value);
                         hashtable_insert(hashtable, key, value);
-                        free(key);
 
                         /* Set non-blocking flag again */
                         fcntl(map->outs[i], F_SETFL, oldflg | O_NONBLOCK);
                         //fprintf(stderr, " [SHUFFLE] Ready to get next key\n");
                 }
         }
+        buf_free(key_buf);
+        buf_free(val_buf);
+
         fprintf(stderr, " [SHUFFLER] Reading completed, send key-values to reducer nodes\n");
 
         /* Now for debugging: view hash table */

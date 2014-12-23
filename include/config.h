@@ -18,5 +18,6 @@
 #define CONFIG_DFL_HASH_SEED 257                /**< Default shuffler hashtable seed */
 #define CONFIG_DFL_HEAPTABLE_ROW 2048           /**< Default heap chunks number */
 #define CONFIG_DFL_HEAP_CHUNK_SIZE 1048577      /**< Default heap chunk size (in bytes) */
+//#define CONFIG_DFL_HEAP_CHUNK_SIZE 1024
 
 #endif

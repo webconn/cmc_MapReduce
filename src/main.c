@@ -19,6 +19,9 @@
 #include "cmrio.h"
 #include "ui.h"
 
+/**
+ * CMapReduce bootstrap
+ */
 int main(int argc, char *argv[])
 {
         clock_t timer = clock();
